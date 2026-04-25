@@ -1,13 +1,13 @@
 ---
-allowed-tools: Bash(jj log:*), Bash(jj diff:*), Bash(jj show:*), Bash(jj file annotate:*), Bash(jj status:*), Bash(jj root:*), Bash(git log:*), Bash(git blame:*), Bash(git show:*), Bash(git diff:*), Bash(git rev-parse:*), Bash(git status:*), Read, Grep, Glob
-argument-hint: "[--git] [revset-or-refspec]"
-description: Read-only local code review of a jj revset or git refspec
+allowed-tools: Bash(jj log:*), Bash(jj diff:*), Bash(jj show:*), Bash(jj file annotate:*), Bash(jj file list:*), Bash(jj status:*), Bash(jj root:*), Bash(git log:*), Bash(git blame:*), Bash(git show:*), Bash(git diff:*), Bash(git rev-parse:*), Bash(git ls-files:*), Bash(git status:*), Read, Grep, Glob
+argument-hint: "[--git] [revset-or-refspec | all]"
+description: Read-only local code review of a jj revset, git refspec, or the whole codebase
 disable-model-invocation: false
 ---
 
 # Local code review
 
-Run a local-only code review on the change identified by `$ARGUMENTS`. Output is plain text in the chat. Nothing is committed, sent, or modified.
+Run a local-only code review on the change identified by `$ARGUMENTS`, or on the entire tracked codebase when `$ARGUMENTS` is `all`. Output is plain text in the chat. Nothing is committed, sent, or modified.
 
 ## Read-only constraint
 
@@ -25,7 +25,7 @@ Even when one of these would be convenient, it stays off the table.
 `$ARGUMENTS` may contain:
 
 1. An optional `--git` flag (anywhere in the string) which forces git mode.
-2. A revset (jj) or refspec (git). Optional. Defaults below.
+2. A revset (jj), refspec (git), or the literal keyword `all`. Optional. Defaults below.
 
 Examples:
 
@@ -36,19 +36,20 @@ Examples:
 - `main..HEAD` — either: changes on the current branch relative to main
 - `--git HEAD~3..HEAD` — force git mode, review the last three commits
 - `--git abc1234` — force git mode, review the commit with that SHA prefix
+- `all` — review every tracked file in the working copy (no diff). Works in either VCS; `--git all` forces git mode. See "Whole-codebase mode" below.
 
 ## Pipeline
 
 ### A. Set up
 
-1. Parse `$ARGUMENTS`. Strip a `--git` token if present and remember whether it was there. Whatever remains is the **target**.
+1. Parse `$ARGUMENTS`. Strip a `--git` token if present and remember whether it was there. Whatever remains is the **target**. If the remaining target is the literal token `all` (case-sensitive, exact match), set a `whole_codebase` flag and skip revset/refspec resolution entirely — see "Whole-codebase mode" below for the per-step deltas.
 2. Decide the VCS:
    - If `--git` was present: VCS is git. Verify with `git rev-parse --show-toplevel`. If that fails, stop and reply: "`--git` was specified but no git repository is present here."
    - Else, try `jj root`. Success → VCS is jj. (This includes jj-colocated-with-git repos. jj is the preferred view when both exist.)
    - Else, try `git rev-parse --show-toplevel`. Success → VCS is git.
    - Else, stop and reply: "This directory is not inside a jj or git repository."
 3. Apply the default target if the user did not supply one:
-   - jj: default to `@`. If `jj diff -r "@" --name-only` is empty, fall back to `@-` and note this in the final report header (e.g., `jj: @- (fell back from empty @)`). If `@-` is also empty, stop and reply: "No file changes in `@` or `@-`."
+   - jj: default to `@`. If `jj diff -r "@" --name-only` is empty, fall back to `@-` and note this in the final report header (e.g., ``jj: `@-` (fell back from empty `@`)``). If `@-` is also empty, stop and reply: "No file changes in `@` or `@-`."
    - git: default to `HEAD`.
 4. Validate the target exists and contains changes:
    - jj: `jj log -r "<target>" --no-graph --template 'change_id ++ "\n"'` should succeed and return at least one row. Then `jj diff -r "<target>" --name-only` should be non-empty. (When the target was chosen by the default-fallback in step 3, this is already known.)
@@ -153,7 +154,45 @@ When all findings filter out, or there were no candidates:
 Nothing flagged. The pipeline ran rules, defects, and context passes; no finding scored ≥ 7.
 ```
 
-Substitute `<vcs>` with literal `jj` or `git`.
+Substitute `<vcs>` with literal `jj` or `git`. The `<target>` slot is rendered with backticks; it may carry an annotation in parentheses outside the backticks (e.g., the empty-`@` fallback note in step A.3, or the file count in whole-codebase mode — see "Whole-codebase mode" below).
+
+## Whole-codebase mode (`all`)
+
+When the target is `all`, the pipeline above runs with these deltas:
+
+### A. Set up
+
+- Skip step A.3 (no default needed) and step A.4 (no diff to validate). Replace with:
+  - Enumerate tracked files at the working copy: `jj file list` (jj) or `git ls-files` (git). The result is the **file set**.
+  - If the file set is empty, stop and reply: "Repository has no tracked files."
+  - **Soft cap:** if the file set has more than 200 files, stop and reply: "`all` covers <N> files, which exceeds the 200-file cap. Narrow the scope with a revset or refspec." The cap exists because the pipeline cost grows linearly with files, and a whole-codebase audit on a large repo is better split into focused passes by the user.
+- Step A.5 (locate CLAUDE.md) still applies — walk from the repo root and from each directory containing a tracked file.
+
+### B. Gather intent
+
+There is no change description. The Haiku agent instead produces a 2–4 sentence summary of *what the codebase is*, reading: the top-level `README*` if present, the root `CLAUDE.md` if present, and the output of `jj file list` / `git ls-files` for shape. This summary is passed to downstream agents in place of the change-intent summary.
+
+### C. Three parallel review passes
+
+Each pass receives: the codebase summary, the file set (paths only — not contents), and the list of CLAUDE.md paths. Agents read file contents themselves via `Read`/`Grep`/`Glob`.
+
+- **Pass 1 — Rules:** unchanged in spirit. Audit each tracked file against the CLAUDE.md files in its directory or ancestors. Flag only when the file visibly deviates from a quotable rule.
+- **Pass 2 — Defects:** read each file (not "the diff — no extra context"; there is no diff). Look for the same concrete defect categories. The "skip if verifying requires reading code not in the diff" rule becomes "skip if verifying requires running the code or reasoning about runtime state the file does not pin down." Cross-file calls are fair game because the agent can `Read` the callee.
+- **Pass 3 — Context:** the *history* sub-pass is **skipped** in `all` mode (annotating every line of every file is not the user's ask). The *comments* sub-pass still runs: read inline comments throughout the file set and flag where current code contradicts a constraint a comment encodes.
+
+### D. Validate and score
+
+Unchanged.
+
+### E. Report
+
+Replace the header with:
+
+```
+### Local code review — <vcs>: `all` (<N> tracked files)
+```
+
+Everything else is the same.
 
 ## Notes
 

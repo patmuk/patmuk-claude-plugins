@@ -5,7 +5,7 @@ The first iteration was vibe coded.
 
 ## What it does
 
-The `/code-review-local:review` command takes a target (a jj revset or a git refspec; defaults to the current change), runs a multi-pass review pipeline against it, and prints findings back into your conversation. It never modifies the repository.
+The `/code-review-local:review` command takes a target (a jj revset, a git refspec, or the literal keyword `all` for the whole tracked codebase; defaults to the current change), runs a multi-pass review pipeline against it, and prints findings back into your conversation. It never modifies the repository.
 
 The pipeline:
 
@@ -41,7 +41,7 @@ Despite the "local" in the name, the plugin is not tied to trunk-based developme
 
 ## Read-only guarantee
 
-The plugin's `allowed-tools` whitelist permits only read-only jj and git subcommands: `jj log`, `jj diff`, `jj show`, `jj file annotate`, `jj status`, `jj root`, `git log`, `git blame`, `git show`, `git diff`, `git rev-parse`, `git status`. Nothing on this list can change the repository, the working copy, the operation log, or any remote.
+The plugin's `allowed-tools` whitelist permits only read-only jj and git subcommands: `jj log`, `jj diff`, `jj show`, `jj file annotate`, `jj file list`, `jj status`, `jj root`, `git log`, `git blame`, `git show`, `git diff`, `git rev-parse`, `git ls-files`, `git status`. Nothing on this list can change the repository, the working copy, the operation log, or any remote.
 
 The command's prompt also explicitly forbids the corresponding write commands by name, so even if the model imagined a write would help (it shouldn't), the permission layer would reject it. Run the review against any change you like, including unfinished or experimental ones, without worry that it might rewrite history or push something.
 
@@ -59,11 +59,12 @@ From this marketplace:
 In a jj repository:
 
 ```text
-/code-review-local:review              # reviews @ (the current change)
+/code-review-local:review              # reviews @ (the current change), or @- if @ has no file changes
 /code-review-local:review @-           # reviews the parent change
 /code-review-local:review trunk()..@   # reviews the whole local stack
 /code-review-local:review kpqxywon     # reviews a specific change id
 /code-review-local:review main..@      # reviews the current branch vs main
+/code-review-local:review all          # reviews every tracked file in the working copy
 ```
 
 In a plain git repository:
@@ -74,9 +75,23 @@ In a plain git repository:
 /code-review-local:review HEAD~3..HEAD # reviews the last three commits
 /code-review-local:review main..HEAD   # reviews the current branch vs main
 /code-review-local:review abc1234      # reviews a specific commit
+/code-review-local:review all          # reviews every tracked file in the working copy
 ```
 
 The plugin auto-detects which VCS is in use and interprets the argument accordingly.
+
+### Whole-codebase mode (`all`)
+
+`all` is a special keyword (not a revset or refspec). Instead of a diff, the pipeline enumerates every tracked file (`jj file list` or `git ls-files`) and runs the review passes against the file contents directly:
+
+- **Rules** still audits each file against its applicable `CLAUDE.md`.
+- **Defects** reads the file (not a diff). Cross-file calls are fair game because the agent can `Read` the callee.
+- **Context** keeps the inline-comments sub-pass and **skips** the history sub-pass — annotating every line of every file is not what `all` is for.
+- **Intent** becomes a short codebase summary (from the top-level `README` and root `CLAUDE.md`) rather than a change description.
+
+There is a **soft cap of 200 tracked files**. Above that, the command stops and asks you to narrow the scope, because the pipeline cost grows linearly with files and a whole-repo audit on a large codebase is better split into focused passes. Use a revset/refspec target instead — e.g., `trunk()..@` for everything you've added, or `main..HEAD` for a feature branch.
+
+`--git all` works the same way and forces git mode.
 
 ### Auto-detection and the `--git` override
 
@@ -191,6 +206,7 @@ The header names the VCS and the target so you can always tell which code path r
 - `### Local code review — jj: \`trunk()..@\``
 - `### Local code review — git: \`HEAD\``
 - `### Local code review — git: \`main..HEAD\``
+- `### Local code review — jj: \`all\` (47 tracked files)`
 
 A review with findings (jj target):
 

@@ -1,6 +1,6 @@
 {
   "name": "code-review-local",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Local code review using jj (jujutsu) on a given revset. Runs the same multi-agent confidence-scored review as /code-review, but against jj revisions rather than a GitHub PR, and posts the result back into the chat instead of to GitHub.",
   "author": {
     "name": "Adapted from Anthropic's /code-review plugin by Boris Cherny, first iteratoion was vibe coded."
