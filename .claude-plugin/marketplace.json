@@ -1,0 +1,17 @@
+{
+  "name": "patmuk-plugins",
+  "version": "1.0.0",
+  "description": "patmuk's marketplace for Claude Code",
+  "owner": {
+    "name": "patmuk"
+  },
+  "plugins": [
+    {
+      "name": "code-review-local",
+      "source": "./plugins/code-review-local",
+      "description": "Local code review using multiple parallel agents with confidence scoring. Like Anthropic's official /code-review plugin, but operates on a local jj revset or git refspec instead of a GitHub pull request — findings are posted back into the chat. Read-only: never modifies the repository.",
+      "category": "development",
+      "keywords": ["code-review", "review", "jj", "jujutsu", "git", "vcs", "local", "read-only"]
+    }
+  ]
+}

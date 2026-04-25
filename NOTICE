@@ -1,0 +1,21 @@
+# NOTICE
+
+This repository (`patmuk-claude-plugins`) is licensed under the MIT License (see `LICENSE`).
+
+## On the design of `code-review-local`
+
+The `code-review-local` plugin's general approach — "have an LLM review a diff using multiple parallel passes and a confidence-based filter" — is inspired by Anthropic's official `code-review` plugin, which lives at `anthropics/claude-code` under `plugins/code-review/`. That repository carries a "© Anthropic PBC. All rights reserved." license, which does not grant general open-source rights.
+
+To avoid relying on rights we don't have, the prompt in `plugins/code-review-local/commands/review.md` was written from the spec rather than adapted from the upstream prompt. Substantive design differences:
+
+- **Three review passes** (rules, defects, context) instead of five (the upstream uses two redundant CLAUDE.md passes plus separate history and code-comment passes; here, history and code-comment are unified under "context", and the redundant pass is dropped in favor of mandatory `evidence` plus validation).
+- **A required `evidence` field** on every candidate finding, so the validator has a concrete artifact to check rather than re-deriving from the diff.
+- **A 1–10 confidence scale** with a threshold of 7, instead of the upstream's 0–100 scale with a threshold of 80. The rubric language is also different.
+- **A different output format** — kind-tagged headings with quoted evidence under each finding, not a numbered list with parenthetical reasons.
+- **VCS detection logic** (jj revsets, git refspecs, `--git` override) — entirely original.
+- **An explicit safety section** with a per-VCS list of forbidden subcommands, plus a tightly scoped `allowed-tools` whitelist.
+- **A per-flag false-positive list** including "the agent cannot describe the harm in concrete terms" and "the finding restates a tautology of the change," which are this plugin's additions.
+
+The general *idea* of multi-pass review with confidence scoring is not, in itself, copyrightable expression — it is a method, and methods are not protected by copyright in the relevant jurisdictions. What is protected is the specific text of the upstream prompt, which this plugin does not reproduce.
+
+If Anthropic, the original author of the official `code-review` plugin, or any other rights-holder believes there is a problem with this characterization or with anything in this repository, please open an issue on this repository or email the maintainer; concerns will be addressed promptly.
