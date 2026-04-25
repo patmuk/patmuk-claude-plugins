@@ -29,7 +29,7 @@ Even when one of these would be convenient, it stays off the table.
 
 Examples:
 
-- *(empty)* — review the current change (`@` in jj, `HEAD` in git)
+- *(empty)* — review the current change (`@` in jj, falling back to `@-` if `@` has no file changes; `HEAD` in git)
 - `@-` — jj: parent of the working copy
 - `HEAD~2` — git: two commits back
 - `trunk()..@` — jj: every change above trunk
@@ -47,9 +47,11 @@ Examples:
    - Else, try `jj root`. Success → VCS is jj. (This includes jj-colocated-with-git repos. jj is the preferred view when both exist.)
    - Else, try `git rev-parse --show-toplevel`. Success → VCS is git.
    - Else, stop and reply: "This directory is not inside a jj or git repository."
-3. Apply the default target if the user did not supply one: `@` for jj, `HEAD` for git.
+3. Apply the default target if the user did not supply one:
+   - jj: default to `@`. If `jj diff -r "@" --name-only` is empty, fall back to `@-` and note this in the final report header (e.g., `jj: @- (fell back from empty @)`). If `@-` is also empty, stop and reply: "No file changes in `@` or `@-`."
+   - git: default to `HEAD`.
 4. Validate the target exists and contains changes:
-   - jj: `jj log -r "<target>" --no-graph --template 'change_id ++ "\n"'` should succeed and return at least one row. Then `jj diff -r "<target>" --name-only` should be non-empty.
+   - jj: `jj log -r "<target>" --no-graph --template 'change_id ++ "\n"'` should succeed and return at least one row. Then `jj diff -r "<target>" --name-only` should be non-empty. (When the target was chosen by the default-fallback in step 3, this is already known.)
    - git: if the target contains `..`, treat it as a range; validate with `git log <target> --oneline -1`. Otherwise treat it as a single commit-ish, validate with `git rev-parse --verify <target>`, and define the effective range as `<target>^..<target>`. Then `git diff --name-only <range>` should be non-empty.
    - On any failure, stop and reply with the precise reason ("Target `xyz` does not resolve.", "No file changes in `xyz`.", etc.).
 5. Locate `CLAUDE.md` files. Walk from the repo root and from each directory containing a touched file. Collect the set of CLAUDE.md paths encountered. If none exist, that's fine — note it for the rules pass.
