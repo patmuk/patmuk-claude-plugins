@@ -1,0 +1,8 @@
+{
+  "name": "pipeline",
+  "version": "0.1.0",
+  "description": "A gated task pipeline for jj repositories whose work is tracked in plan docs: gap report, spec, vertical-slice implementation, wrap-up review, decision maps, device test rounds. Written for projects that import the llm_rules general rules.",
+  "author": {
+    "name": "patmuk"
+  }
+}

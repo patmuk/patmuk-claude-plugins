@@ -12,6 +12,13 @@
       "description": "Local code review using multiple parallel agents with confidence scoring. Like Anthropic's official /code-review plugin, but operates on a local jj revset or git refspec instead of a GitHub pull request — findings are posted back into the chat. Read-only: never modifies the repository.",
       "category": "development",
       "keywords": ["code-review", "review", "jj", "jujutsu", "git", "vcs", "local", "read-only"]
+    },
+    {
+      "name": "pipeline",
+      "source": "./plugins/pipeline",
+      "description": "A gated task pipeline as skills for jj repositories tracked in plan docs: gap report, spec with a one-screen brief, vertical-slice implementation, two-axis wrap-up review, decision maps, device test rounds. Calls Matt Pocock's thinking skills; replaces his pipeline skills.",
+      "category": "development",
+      "keywords": ["pipeline", "spec", "tdd", "jj", "jujutsu", "plan", "review", "workflow"]
     }
   ]
 }

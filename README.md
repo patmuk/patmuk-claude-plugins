@@ -7,6 +7,7 @@ My [Claude Code](https://code.claude.com) plugins marketplace for modified, vibe
 | Plugin                                              | Description                                                                                                                                                   |
 |-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | [`code-review-local`](./plugins/code-review-local)  | Local code review on a **jj revset** or **git refspec**, adapted from Anthropic's official `/code-review` plugin. Operates on local changes, posts to the chat. Read-only — never modifies the repository. First iteration was vibe coded.|
+| [`pipeline`](./plugins/pipeline)                    | A gated task pipeline as skills for **jj** repositories tracked in plan docs: gap report, spec, vertical-slice implementation, wrap-up review, decision maps, device test rounds. |
 
 ## Installing a plugin from this marketplace
 
